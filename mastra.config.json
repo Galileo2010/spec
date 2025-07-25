@@ -1,0 +1,60 @@
+{
+  "name": "spec-assistant-platform",
+  "version": "0.1.0",
+  "description": "智能规范助手平台 AI 配置",
+  "models": {
+    "default": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.7,
+      "maxTokens": 2000
+    },
+    "requirements": {
+      "provider": "openai", 
+      "model": "gpt-4",
+      "temperature": 0.5,
+      "maxTokens": 3000,
+      "systemPrompt": "你是一个专业的需求分析师，擅长将自然语言描述转换为结构化的需求文档。请使用EARS格式编写验收标准。"
+    },
+    "design": {
+      "provider": "openai",
+      "model": "gpt-4", 
+      "temperature": 0.6,
+      "maxTokens": 4000,
+      "systemPrompt": "你是一个资深的系统架构师，擅长设计可扩展、高性能的系统架构。请提供详细的技术设计方案。"
+    },
+    "tasks": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.4,
+      "maxTokens": 3000,
+      "systemPrompt": "你是一个经验丰富的项目经理，擅长将设计文档分解为具体的开发任务。请确保任务间的依赖关系清晰。"
+    }
+  },
+  "prompts": {
+    "generateRequirements": {
+      "template": "基于以下项目描述，生成结构化的需求文档：\n\n项目描述：{input}\n\n请包含：\n1. 项目概述\n2. 功能需求（用户故事格式）\n3. 验收标准（EARS格式）\n4. 非功能性需求\n\n输出格式：Plate.js文档结构的JSON数组",
+      "variables": ["input"]
+    },
+    "generateDesign": {
+      "template": "基于以下需求文档，生成技术设计文档：\n\n需求文档：{requirements}\n\n请包含：\n1. 系统架构概述\n2. 技术栈选择\n3. 组件设计\n4. 数据模型\n5. API设计\n6. 错误处理策略\n\n输出格式：Plate.js文档结构的JSON数组",
+      "variables": ["requirements"]
+    },
+    "generateTasks": {
+      "template": "基于以下设计文档，生成具体的开发任务：\n\n设计文档：{design}\n需求文档：{requirements}\n\n请包含：\n1. 任务分解（按模块）\n2. 任务依赖关系\n3. 实施顺序\n4. 验收标准引用\n\n输出格式：Plate.js文档结构的JSON数组，使用复选框列表",
+      "variables": ["design", "requirements"]
+    },
+    "analyzeContent": {
+      "template": "分析以下{specType}文档的质量：\n\n文档内容：{content}\n\n请评估：\n1. 完整性\n2. 清晰度\n3. 可测试性\n4. 一致性\n\n提供改进建议和缺失元素。",
+      "variables": ["specType", "content"]
+    }
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 3600
+  },
+  "rateLimiting": {
+    "enabled": true,
+    "requestsPerMinute": 60
+  }
+}
