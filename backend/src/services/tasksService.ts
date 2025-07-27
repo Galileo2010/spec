@@ -4,13 +4,13 @@ export interface TaskItem {
   id: string
   title: string
   description: string
-  priority: 'high' | 'medium' | 'low'
-  estimatedHours: number
+  status: 'not_started' | 'in_progress' | 'completed'
+  priority: 'low' | 'medium' | 'high'
+  estimatedHours?: number
   dependencies: string[]
   requirements: string[]
-  status: 'not_started' | 'in_progress' | 'completed'
-  assignee?: string
   tags: string[]
+  assignee?: string
 }
 
 export interface TaskGroup {
@@ -24,7 +24,7 @@ export interface TaskGroup {
 export interface TaskDependency {
   from: string
   to: string
-  type: 'blocks' | 'depends_on' | 'related'
+  type: 'blocks' | 'enables' | 'related'
 }
 
 export class TasksService {
@@ -35,28 +35,32 @@ export class TasksService {
   }
 
   async generateTasks(
-    requirements: any[], 
     design: any[], 
-    context?: any
+    requirements: any[], 
+    options?: {
+      methodology?: 'agile' | 'waterfall' | 'kanban'
+      teamSize?: number
+      timeline?: string
+    }
   ): Promise<any[]> {
     try {
-      // Analyze requirements and design to extract task information
-      const taskAnalysis = this.analyzeForTasks(requirements, design)
+      // Analyze design and requirements to extract task information
+      const taskAnalysis = this.analyzeForTasks(design, requirements)
       
       // Generate tasks using AI
       const tasks = await this.aiService.generateSpec({
-        input: this.formatInputForTasks(requirements, design),
+        input: this.formatInputForTasks(design, requirements),
         specType: 'tasks',
         context: {
-          ...context,
-          requirements,
           design,
-          analysis: taskAnalysis
+          requirements,
+          analysis: taskAnalysis,
+          options
         }
       })
 
-      // Enhance with task dependencies and best practices
-      const enhancedTasks = this.enhanceWithDependencies(tasks, taskAnalysis)
+      // Enhance with task dependencies and priorities
+      const enhancedTasks = this.enhanceWithTaskStructure(tasks, taskAnalysis)
       
       return enhancedTasks
     } catch (error) {
@@ -71,6 +75,7 @@ export class TasksService {
     suggestions: string[]
     completeness: number
     feasibility: number
+    dependencies: number
   }> {
     try {
       const analysis = await this.aiService.analyzeContent(content, 'tasks')
@@ -79,15 +84,104 @@ export class TasksService {
       const validation = this.validateTaskStructure(content)
       
       return {
-        isValid: validation.hasTaskLists && validation.hasEstimates,
+        isValid: validation.hasTaskLists && validation.hasCheckboxes,
         issues: validation.issues,
         suggestions: analysis.suggestions || [],
         completeness: analysis.completeness || 0,
-        feasibility: analysis.feasibility || 0
+        feasibility: analysis.feasibility || 0,
+        dependencies: analysis.dependencies || 0
       }
     } catch (error) {
       console.error('Error validating tasks:', error)
       throw new Error('Failed to validate tasks document')
+    }
+  }
+
+  extractTasksFromContent(content: any[]): TaskItem[] {
+    const tasks: TaskItem[] = []
+    let currentGroup = ''
+    let taskCounter = 0
+
+    for (const item of content) {
+      if (item.type === 'heading') {
+        currentGroup = this.extractTextFromChildren(item.children)
+      } else if (item.type === 'list') {
+        const listTasks = this.extractTasksFromList(item, currentGroup)
+        tasks.push(...listTasks)
+      }
+    }
+
+    return tasks
+  }
+
+  analyzeDependencies(tasks: TaskItem[]): TaskDependency[] {
+    const dependencies: TaskDependency[] = []
+    
+    for (const task of tasks) {
+      for (const depId of task.dependencies) {
+        const dependentTask = tasks.find(t => t.id === depId)
+        if (dependentTask) {
+          dependencies.push({
+            from: depId,
+            to: task.id,
+            type: 'blocks'
+          })
+        }
+      }
+    }
+
+    return dependencies
+  }
+
+  generateTaskTimeline(tasks: TaskItem[], dependencies: TaskDependency[]): {
+    phases: TaskGroup[]
+    criticalPath: string[]
+    estimatedDuration: number
+  } {
+    // Simple task scheduling algorithm
+    const phases: TaskGroup[] = []
+    const processed = new Set<string>()
+    let phaseCounter = 1
+
+    while (processed.size < tasks.length) {
+      const availableTasks = tasks.filter(task => 
+        !processed.has(task.id) && 
+        task.dependencies.every(depId => processed.has(depId))
+      )
+
+      if (availableTasks.length === 0) {
+        // Handle circular dependencies or orphaned tasks
+        const remainingTasks = tasks.filter(task => !processed.has(task.id))
+        availableTasks.push(...remainingTasks)
+      }
+
+      if (availableTasks.length > 0) {
+        phases.push({
+          id: `phase-${phaseCounter}`,
+          name: `阶段 ${phaseCounter}`,
+          description: `第 ${phaseCounter} 个开发阶段`,
+          tasks: availableTasks,
+          order: phaseCounter
+        })
+
+        availableTasks.forEach(task => processed.add(task.id))
+        phaseCounter++
+      }
+    }
+
+    // Calculate critical path (simplified)
+    const criticalPath = this.findCriticalPath(tasks, dependencies)
+    
+    // Calculate estimated duration
+    const estimatedDuration = phases.reduce((total, phase) => {
+      const phaseHours = Math.max(...phase.tasks.map(t => t.estimatedHours || 8))
+      return total + phaseHours
+    }, 0)
+
+    return {
+      phases,
+      criticalPath,
+      estimatedDuration
     }
   }
 
@@ -100,205 +194,169 @@ export class TasksService {
     }
   }
 
-  analyzeDependencies(tasks: TaskItem[]): TaskDependency[] {
-    const dependencies: TaskDependency[] = []
-    
-    // Simple dependency analysis based on task names and descriptions
-    for (let i = 0; i < tasks.length; i++) {
-      for (let j = i + 1; j < tasks.length; j++) {
-        const task1 = tasks[i]
-        const task2 = tasks[j]
-        
-        // Check if task2 depends on task1
-        if (this.checkDependency(task1, task2)) {
-          dependencies.push({
-            from: task1.id,
-            to: task2.id,
-            type: 'blocks'
-          })
-        }
-      }
-    }
-    
-    return dependencies
-  }
-
-  estimateTaskEffort(taskDescription: string, complexity: 'simple' | 'moderate' | 'complex'): number {
-    // Simple estimation based on keywords and complexity
-    const baseHours = {
-      'simple': 4,
-      'moderate': 8,
-      'complex': 16
-    }
-    
-    let multiplier = 1
-    const description = taskDescription.toLowerCase()
-    
-    // Adjust based on task type
-    if (description.includes('setup') || description.includes('config')) {
-      multiplier = 0.5
-    } else if (description.includes('integration') || description.includes('api')) {
-      multiplier = 1.5
-    } else if (description.includes('testing') || description.includes('test')) {
-      multiplier = 0.8
-    } else if (description.includes('ui') || description.includes('frontend')) {
-      multiplier = 1.2
-    } else if (description.includes('database') || description.includes('migration')) {
-      multiplier = 1.3
-    }
-    
-    return Math.round(baseHours[complexity] * multiplier)
-  }
-
-  private analyzeForTasks(requirements: any[], design: any[]): {
-    projectType: string
+  private analyzeForTasks(design: any[], requirements: any[]): {
     complexity: 'simple' | 'moderate' | 'complex'
-    estimatedDuration: string
-    keyModules: string[]
-    criticalPath: string[]
+    estimatedTasks: number
+    suggestedPhases: string[]
+    keyComponents: string[]
   } {
-    const requirementsText = this.extractTextFromContent(requirements)
-    const designText = this.extractTextFromContent(design)
-    const combinedText = (requirementsText + ' ' + designText).toLowerCase()
-    
-    // Determine project type
-    let projectType = 'web-development'
-    if (combinedText.includes('mobile') || combinedText.includes('app')) {
-      projectType = 'mobile-development'
-    } else if (combinedText.includes('api') || combinedText.includes('service')) {
-      projectType = 'api-development'
-    } else if (combinedText.includes('data') || combinedText.includes('analytics')) {
-      projectType = 'data-platform'
-    }
+    const designText = this.extractTextFromContent(design).toLowerCase()
+    const requirementsText = this.extractTextFromContent(requirements).toLowerCase()
+    const combinedText = `${designText} ${requirementsText}`
 
-    // Determine complexity
-    const featureCount = (combinedText.match(/feature|function|requirement/g) || []).length
+    // Analyze complexity
+    const complexityIndicators = ['microservice', 'distributed', 'scalable', 'real-time', 'machine learning']
+    const complexityScore = complexityIndicators.filter(indicator => 
+      combinedText.includes(indicator)
+    ).length
+
     let complexity: 'simple' | 'moderate' | 'complex' = 'moderate'
-    if (featureCount > 15) {
+    if (complexityScore >= 3) {
       complexity = 'complex'
-    } else if (featureCount < 8) {
+    } else if (complexityScore <= 1) {
       complexity = 'simple'
     }
 
-    // Extract key modules
-    const keyModules = this.extractModules(combinedText)
-    
-    // Estimate duration
-    const estimatedDuration = this.estimateProjectDuration(complexity, keyModules.length)
-    
+    // Estimate number of tasks
+    const featureCount = (combinedText.match(/feature|function|requirement/g) || []).length
+    const estimatedTasks = Math.max(featureCount * 3, 10) // At least 10 tasks
+
+    // Suggest phases
+    const suggestedPhases = [
+      '项目初始化',
+      '核心功能开发',
+      '集成测试',
+      '部署发布'
+    ]
+
+    if (complexity === 'complex') {
+      suggestedPhases.splice(2, 0, '性能优化', '安全加固')
+    }
+
+    // Extract key components
+    const keyComponents = this.extractKeyComponents(combinedText)
+
     return {
-      projectType,
       complexity,
-      estimatedDuration,
-      keyModules,
-      criticalPath: this.identifyCriticalPath(keyModules)
+      estimatedTasks,
+      suggestedPhases,
+      keyComponents
     }
   }
 
-  private formatInputForTasks(requirements: any[], design: any[]): string {
-    const reqText = this.extractTextFromContent(requirements)
+  private extractKeyComponents(text: string): string[] {
+    const components = []
+    const componentKeywords = [
+      'frontend', 'backend', 'database', 'api', 'authentication', 
+      'authorization', 'payment', 'notification', 'search', 'analytics'
+    ]
+
+    for (const keyword of componentKeywords) {
+      if (text.includes(keyword)) {
+        components.push(keyword)
+      }
+    }
+
+    return components
+  }
+
+  private formatInputForTasks(design: any[], requirements: any[]): string {
     const designText = this.extractTextFromContent(design)
+    const requirementsText = this.extractTextFromContent(requirements)
     
-    return `基于以下需求和设计文档，生成具体的开发任务：
+    return `基于以下设计文档和需求文档，生成具体的开发任务：
 
-需求文档摘要：
-${reqText.substring(0, 1000)}
+设计文档：
+${designText}
 
-设计文档摘要：
-${designText.substring(0, 1000)}
+需求文档：
+${requirementsText}
 
-请生成结构化的任务列表，包括任务分组、优先级和依赖关系。`
+请生成结构化的任务列表，包含任务依赖关系和优先级。`
   }
 
   private extractTextFromContent(content: any[]): string {
-    return content.map(item => this.extractTextFromItem(item)).join(' ')
-  }
-
-  private extractTextFromItem(item: any): string {
-    if (item.children) {
-      return item.children.map((child: any) => this.extractTextFromItem(child)).join(' ')
-    }
-    return item.text || ''
-  }
-
-  private enhanceWithDependencies(tasks: any[], analysis: any): any[] {
-    // Add task estimation and dependency information
-    return tasks.map(item => {
-      if (item.type === 'list' && item.listType === 'unordered') {
-        return {
-          ...item,
-          children: item.children.map((listItem: any) => {
-            if (listItem.type === 'list-item') {
-              const text = this.extractTextFromItem(listItem)
-              const enhanced = this.enhanceTaskItem(text, analysis)
-              return {
-                ...listItem,
-                children: [{ text: enhanced }]
-              }
-            }
-            return listItem
-          })
-        }
+    return content.map(item => {
+      if (item.children) {
+        return this.extractTextFromChildren(item.children)
       }
-      return item
-    })
+      return ''
+    }).join(' ').trim()
   }
 
-  private enhanceTaskItem(taskText: string, analysis: any): string {
-    // Add estimation and priority information
-    const estimation = this.estimateTaskEffort(taskText, analysis.complexity)
-    const priority = this.determinePriority(taskText, analysis.criticalPath)
-    
-    return `${taskText} (预估: ${estimation}小时, 优先级: ${priority})`
-  }
-
-  private determinePriority(taskText: string, criticalPath: string[]): string {
-    const text = taskText.toLowerCase()
-    
-    // Check if task is on critical path
-    for (const critical of criticalPath) {
-      if (text.includes(critical.toLowerCase())) {
-        return '高'
+  private extractTextFromChildren(children: any[]): string {
+    return children.map(child => {
+      if (child.text) {
+        return child.text
       }
+      if (child.children) {
+        return this.extractTextFromChildren(child.children)
+      }
+      return ''
+    }).join('')
+  }
+
+  private enhanceWithTaskStructure(tasks: any[], analysis: any): any[] {
+    // Add task management enhancements
+    const enhancedTasks = [...tasks]
+
+    // Insert task overview section
+    const overviewIndex = enhancedTasks.findIndex(item => 
+      item.type === 'heading' && item.level === 2
+    )
+
+    if (overviewIndex !== -1) {
+      enhancedTasks.splice(overviewIndex, 0, {
+        type: 'heading',
+        level: 2,
+        children: [{ text: '任务概览' }]
+      }, {
+        type: 'paragraph',
+        children: [{ 
+          text: `项目复杂度：${analysis.complexity}，预估任务数量：${analysis.estimatedTasks}` 
+        }]
+      }, {
+        type: 'paragraph',
+        children: [{ 
+          text: `建议开发阶段：${analysis.suggestedPhases.join(' → ')}` 
+        }]
+      })
     }
-    
-    // Check for high priority keywords
-    if (text.includes('setup') || text.includes('基础') || text.includes('架构')) {
-      return '高'
-    }
-    
-    // Check for low priority keywords
-    if (text.includes('优化') || text.includes('文档') || text.includes('测试')) {
-      return '低'
-    }
-    
-    return '中'
+
+    return enhancedTasks
   }
 
   private validateTaskStructure(content: any[]): {
     hasTaskLists: boolean
-    hasEstimates: boolean
+    hasCheckboxes: boolean
     hasPriorities: boolean
+    hasDependencies: boolean
     issues: string[]
   } {
     let hasTaskLists = false
-    let hasEstimates = false
+    let hasCheckboxes = false
     let hasPriorities = false
+    let hasDependencies = false
     const issues: string[] = []
 
     for (const item of content) {
       if (item.type === 'list') {
         hasTaskLists = true
         
-        // Check for estimates and priorities in list items
         for (const listItem of item.children || []) {
           if (listItem.type === 'list-item') {
-            const text = this.extractTextFromItem(listItem)
-            if (text.includes('预估') || text.includes('小时')) {
-              hasEstimates = true
+            const text = this.extractTextFromChildren(listItem.children)
+            
+            if (text.includes('☐') || text.includes('☑') || text.includes('- [ ]') || text.includes('- [x]')) {
+              hasCheckboxes = true
             }
-            if (text.includes('优先级') || text.includes('高') || text.includes('中') || text.includes('低')) {
+            
+            if (text.includes('优先级') || text.includes('priority') || text.includes('高') || text.includes('中') || text.includes('低')) {
               hasPriorities = true
+            }
+            
+            if (text.includes('依赖') || text.includes('depends') || text.includes('需要')) {
+              hasDependencies = true
             }
           }
         }
@@ -309,91 +367,82 @@ ${designText.substring(0, 1000)}
       issues.push('缺少任务列表')
     }
     
-    if (!hasEstimates) {
-      issues.push('缺少时间估算')
-    }
-    
-    if (!hasPriorities) {
-      issues.push('缺少优先级标识')
+    if (!hasCheckboxes) {
+      issues.push('任务列表缺少复选框格式')
     }
 
     return {
       hasTaskLists,
-      hasEstimates,
+      hasCheckboxes,
       hasPriorities,
+      hasDependencies,
       issues
     }
   }
 
-  private extractModules(text: string): string[] {
-    const modules = []
-    const moduleKeywords = [
-      'authentication', '认证', 'auth',
-      'user management', '用户管理', 'user',
-      'database', '数据库', 'db',
-      'api', 'interface', '接口',
-      'frontend', '前端', 'ui',
-      'backend', '后端', 'server',
-      'payment', '支付', 'billing',
-      'notification', '通知', 'message',
-      'search', '搜索', 'query',
-      'analytics', '分析', 'reporting'
-    ]
+  private extractTasksFromList(listItem: any, group: string): TaskItem[] {
+    const tasks: TaskItem[] = []
     
-    for (const keyword of moduleKeywords) {
-      if (text.includes(keyword)) {
-        modules.push(keyword)
+    if (listItem.children) {
+      for (let i = 0; i < listItem.children.length; i++) {
+        const item = listItem.children[i]
+        if (item.type === 'list-item') {
+          const text = this.extractTextFromChildren(item.children)
+          const task = this.parseTaskFromText(text, group, i)
+          if (task) {
+            tasks.push(task)
+          }
+        }
       }
     }
-    
-    return modules.slice(0, 8) // Limit to 8 modules
+
+    return tasks
   }
 
-  private identifyCriticalPath(modules: string[]): string[] {
-    // Define critical path based on typical development dependencies
-    const criticalOrder = [
-      'database', 'authentication', 'api', 'frontend', 'backend'
-    ]
-    
-    return modules.filter(module => 
-      criticalOrder.some(critical => module.includes(critical))
-    )
-  }
+  private parseTaskFromText(text: string, group: string, index: number): TaskItem | null {
+    if (!text.trim()) return null
 
-  private estimateProjectDuration(complexity: string, moduleCount: number): string {
-    const baseWeeks = {
-      'simple': 4,
-      'moderate': 8,
-      'complex': 16
+    // Extract status from checkbox
+    let status: 'not_started' | 'in_progress' | 'completed' = 'not_started'
+    if (text.includes('☑') || text.includes('[x]')) {
+      status = 'completed'
+    } else if (text.includes('🔄') || text.includes('进行中')) {
+      status = 'in_progress'
     }
-    
-    const weeks = baseWeeks[complexity as keyof typeof baseWeeks] + Math.floor(moduleCount / 2)
-    
-    if (weeks <= 4) return '1个月'
-    if (weeks <= 8) return '2个月'
-    if (weeks <= 12) return '3个月'
-    if (weeks <= 24) return '6个月'
-    return '6个月以上'
+
+    // Clean task title
+    let title = text
+      .replace(/☐|☑|\[ \]|\[x\]|🔄/g, '')
+      .replace(/^\d+\.?\s*/, '')
+      .trim()
+
+    // Extract priority
+    let priority: 'low' | 'medium' | 'high' = 'medium'
+    if (text.includes('高优先级') || text.includes('urgent')) {
+      priority = 'high'
+    } else if (text.includes('低优先级') || text.includes('low')) {
+      priority = 'low'
+    }
+
+    return {
+      id: `${group.toLowerCase().replace(/\s+/g, '-')}-${index}`,
+      title,
+      description: title,
+      status,
+      priority,
+      dependencies: [],
+      requirements: [],
+      tags: [group]
+    }
   }
 
-  private checkDependency(task1: TaskItem, task2: TaskItem): boolean {
-    // Simple dependency check based on common patterns
-    const t1 = task1.title.toLowerCase()
-    const t2 = task2.title.toLowerCase()
-    
-    // Database setup should come before API development
-    if (t1.includes('database') && t2.includes('api')) return true
-    
-    // Authentication should come before user features
-    if (t1.includes('auth') && t2.includes('user')) return true
-    
-    // Backend should come before frontend
-    if (t1.includes('backend') && t2.includes('frontend')) return true
-    
-    // Setup tasks should come first
-    if (t1.includes('setup') && !t2.includes('setup')) return true
-    
-    return false
+  private findCriticalPath(tasks: TaskItem[], dependencies: TaskDependency[]): string[] {
+    // Simplified critical path calculation
+    const criticalTasks = tasks
+      .filter(task => task.priority === 'high' || task.dependencies.length > 0)
+      .map(task => task.id)
+
+    return criticalTasks
   }
 
   private getWebDevelopmentTemplate(): any[] {
@@ -414,11 +463,15 @@ ${designText.substring(0, 1000)}
         children: [
           {
             type: 'list-item',
-            children: [{ text: '☐ 1.1 项目环境搭建 (预估: 4小时, 优先级: 高)' }]
+            children: [{ text: '☐ 1.1 搭建开发环境' }]
           },
           {
             type: 'list-item',
-            children: [{ text: '☐ 1.2 代码仓库初始化 (预估: 2小时, 优先级: 高)' }]
+            children: [{ text: '☐ 1.2 初始化项目结构' }]
+          },
+          {
+            type: 'list-item',
+            children: [{ text: '☐ 1.3 配置构建工具' }]
           }
         ]
       }
