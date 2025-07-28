@@ -8,7 +8,7 @@ import { specRoutes } from './routes/specs'
 import { aiRoutes } from './routes/ai'
 import { errorHandler } from './middleware/errorHandler'
 import { authMiddleware } from './middleware/auth'
-import { initDatabase } from './db/init'
+import { initDatabase } from './db/simple-init'
 
 const app = new Hono()
 

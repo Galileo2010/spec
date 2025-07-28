@@ -1,4 +1,10 @@
-import { TDescendant } from '@udecode/plate-common'
+// 简化的节点类型定义，避免依赖Plate.js
+export interface TDescendant {
+  type?: string
+  children?: TDescendant[]
+  text?: string
+  [key: string]: any
+}
 
 // Plate.js 文档节点类型定义
 interface PlateNode {

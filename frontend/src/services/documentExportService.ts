@@ -1,5 +1,4 @@
-import { TDescendant } from '@udecode/plate-common'
-import { PlateMarkdownConverter } from '@/utils/plateMarkdownConverter'
+import { PlateMarkdownConverter, TDescendant } from '@/utils/plateMarkdownConverter'
 
 export interface ExportOptions {
   format: 'markdown' | 'html' | 'pdf' | 'json'
@@ -255,7 +254,7 @@ export class DocumentExportService {
   }
 
   // 根据格式导出
-  private static async exportByFormat(
+  static async exportByFormat(
     content: TDescendant[], 
     metadata: DocumentMetadata, 
     format: ExportOptions['format']

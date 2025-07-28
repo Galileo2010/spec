@@ -4,31 +4,13 @@ import {
   PlateProvider,
   createPlateEditor, 
   PlateContent,
-  TDescendant,
-  Value
+  TDescendant
 } from '@udecode/plate-common'
-import { 
-  BaseParagraphPlugin,
-  createParagraphPlugin 
-} from '@udecode/plate-basic-elements'
-import { 
-  BaseHeadingPlugin,
-  createHeadingPlugin 
-} from '@udecode/plate-heading'
-import { 
-  BaseListPlugin,
-  createListPlugin 
-} from '@udecode/plate-list'
-import { 
-  BaseBoldPlugin,
-  BaseItalicPlugin,
-  createBoldPlugin, 
-  createItalicPlugin 
-} from '@udecode/plate-basic-marks'
-import { 
-  BaseCodeBlockPlugin,
-  createCodeBlockPlugin 
-} from '@udecode/plate-code-block'
+import { createParagraphPlugin } from '@udecode/plate-basic-elements'
+import { createHeadingPlugin } from '@udecode/plate-heading'
+import { createListPlugin } from '@udecode/plate-list'
+import { createBoldPlugin, createItalicPlugin } from '@udecode/plate-basic-marks'
+import { createCodeBlockPlugin } from '@udecode/plate-code-block'
 import { useProject } from '@/contexts/ProjectContext'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
@@ -101,12 +83,12 @@ export default function PlateEditor({ specType, initialValue, projectId, onSave 
   // Enhanced editor with comprehensive plugins
   const editor = useMemo(() => createPlateEditor({
     plugins: [
-      BaseParagraphPlugin,
-      BaseHeadingPlugin,
-      BaseListPlugin,
-      BaseBoldPlugin,
-      BaseItalicPlugin,
-      BaseCodeBlockPlugin,
+      createParagraphPlugin(),
+      createHeadingPlugin(),
+      createListPlugin(),
+      createBoldPlugin(),
+      createItalicPlugin(),
+      createCodeBlockPlugin(),
     ],
   }), [])
 

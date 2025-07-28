@@ -1,93 +1,64 @@
-import React, { createContext, useContext, useState } from 'react'
-import { Project, SpecFiles } from '@shared/types'
-import { projectService } from '@/lib/api'
+import { createContext, useContext, ReactNode } from 'react'
+
+interface Project {
+  id: string
+  name: string
+  description: string
+  createdAt: string
+  updatedAt: string
+}
 
 interface ProjectContextType {
-  projects: Project[]
-  currentProject: Project | null
-  currentSpecs: SpecFiles | null
-  isLoading: boolean
-  loadProjects: () => Promise<void>
-  selectProject: (projectId: string) => Promise<void>
-  createProject: (name: string, description?: string) => Promise<Project>
-  updateProject: (projectId: string, updates: Partial<Project>) => Promise<void>
-  deleteProject: (projectId: string) => Promise<void>
-  updateSpecs: (projectId: string, specs: SpecFiles) => Promise<void>
+  getSpecs: (projectId: string) => Promise<any>
+  updateSpecs: (projectId: string, specs: any) => Promise<void>
+  getProject: (projectId: string) => Promise<Project>
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
 
-export function ProjectProvider({ children }: { children: React.ReactNode }) {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [currentProject, setCurrentProject] = useState<Project | null>(null)
-  const [currentSpecs, setCurrentSpecs] = useState<SpecFiles | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-
-  const loadProjects = async () => {
-    setIsLoading(true)
-    try {
-      const projectList = await projectService.getProjects()
-      setProjects(projectList)
-    } finally {
-      setIsLoading(false)
+export function ProjectProvider({ children }: { children: ReactNode }) {
+  const getSpecs = async (projectId: string) => {
+    // 模拟 API 调用
+    return {
+      requirements: [
+        {
+          type: 'paragraph',
+          children: [{ text: '这是需求文档的示例内容。' }]
+        }
+      ],
+      design: [
+        {
+          type: 'paragraph',
+          children: [{ text: '这是设计文档的示例内容。' }]
+        }
+      ],
+      tasks: [
+        {
+          type: 'paragraph',
+          children: [{ text: '这是任务文档的示例内容。' }]
+        }
+      ]
     }
   }
 
-  const selectProject = async (projectId: string) => {
-    setIsLoading(true)
-    try {
-      const project = await projectService.getProject(projectId)
-      const specs = await projectService.getSpecs(projectId)
-      setCurrentProject(project)
-      setCurrentSpecs(specs)
-    } finally {
-      setIsLoading(false)
-    }
+  const updateSpecs = async (projectId: string, specs: any) => {
+    // 模拟 API 调用
+    console.log('Updating specs for project:', projectId, specs)
   }
 
-  const createProject = async (name: string, description?: string) => {
-    const project = await projectService.createProject({ name, description })
-    setProjects(prev => [...prev, project])
-    return project
-  }
-
-  const updateProject = async (projectId: string, updates: Partial<Project>) => {
-    const updatedProject = await projectService.updateProject(projectId, updates)
-    setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p))
-    if (currentProject?.id === projectId) {
-      setCurrentProject(updatedProject)
-    }
-  }
-
-  const deleteProject = async (projectId: string) => {
-    await projectService.deleteProject(projectId)
-    setProjects(prev => prev.filter(p => p.id !== projectId))
-    if (currentProject?.id === projectId) {
-      setCurrentProject(null)
-      setCurrentSpecs(null)
-    }
-  }
-
-  const updateSpecs = async (projectId: string, specs: SpecFiles) => {
-    await projectService.updateSpecs(projectId, specs)
-    if (currentProject?.id === projectId) {
-      setCurrentSpecs(specs)
+  const getProject = async (projectId: string): Promise<Project> => {
+    // 模拟 API 调用
+    return {
+      id: projectId,
+      name: '测试项目',
+      description: '用于功能验证的测试项目',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
   }
 
   return (
-    <ProjectContext.Provider value={{
-      projects,
-      currentProject,
-      currentSpecs,
-      isLoading,
-      loadProjects,
-      selectProject,
-      createProject,
-      updateProject,
-      deleteProject,
-      updateSpecs,
-    }}>
+    <ProjectContext.Provider value={{ getSpecs, updateSpecs, getProject }}>
       {children}
     </ProjectContext.Provider>
   )

@@ -1,12 +1,21 @@
 import { Database } from 'bun:sqlite'
 import { join } from 'path'
+import { existsSync, mkdirSync } from 'fs'
 
-const dbPath = join(process.cwd(), 'data', 'database.sqlite')
+const dataDir = join(process.cwd(), 'data')
+const dbPath = join(dataDir, 'database.sqlite')
+
+// Ensure data directory exists
+if (!existsSync(dataDir)) {
+  mkdirSync(dataDir, { recursive: true })
+  console.log('📁 Created data directory')
+}
+
 export const db = new Database(dbPath)
 
 export async function initDatabase() {
   // Enable foreign keys
-  db.pragma('foreign_keys = ON')
+  db.exec('PRAGMA foreign_keys = ON')
   
   // Create users table
   db.exec(`
