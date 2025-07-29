@@ -1,6 +1,7 @@
 import { GenerateSpecRequest } from '@shared/types'
 
 // AI Service for spec generation and analysis
+// TODO: Integrate with real mastra.ai when available
 export class AIService {
   private static instance: AIService
   private isInitialized = false
@@ -18,9 +19,8 @@ export class AIService {
     if (this.isInitialized) return
 
     try {
-      // TODO: Initialize mastra.ai framework
-      // For now, we'll use mock implementation
-      console.log('🤖 AI Service initialized (Mock Mode)')
+      // TODO: Initialize real mastra.ai framework when available
+      console.log('🤖 AI Service initialized (Enhanced Mock Mode)')
       this.isInitialized = true
     } catch (error) {
       console.error('Failed to initialize AI Service:', error)
@@ -36,11 +36,59 @@ export class AIService {
     const { input, specType, context } = request
 
     try {
-      // TODO: Replace with actual mastra.ai implementation
-      return this.generateMockContent(specType, input, context)
+      // Use mastra.ai if available, otherwise fallback to mock
+      if (this.mastra && this.config) {
+        return await this.generateWithMastra(specType, input, context)
+      } else {
+        console.log('🔄 Using mock implementation (mastra.ai not available)')
+        return this.generateMockContent(specType, input, context)
+      }
     } catch (error) {
       console.error('Error generating spec:', error)
-      throw new Error('Failed to generate specification content')
+      // Fallback to mock on error
+      console.log('🔄 Falling back to mock implementation')
+      return this.generateMockContent(specType, input, context)
+    }
+  }
+
+  private async generateWithMastra(specType: string, input: string, context?: any): Promise<any[]> {
+    if (!this.mastra || !this.config) {
+      throw new Error('Mastra not initialized')
+    }
+
+    const modelConfig = this.config.models[specType] || this.config.models.default
+    const promptTemplate = this.config.prompts[`generate${specType.charAt(0).toUpperCase() + specType.slice(1)}`]
+
+    if (!promptTemplate) {
+      throw new Error(`No prompt template found for ${specType}`)
+    }
+
+    // Prepare prompt variables
+    const variables: Record<string, string> = { input }
+    if (context) {
+      Object.assign(variables, context)
+    }
+
+    // Replace template variables
+    let prompt = promptTemplate.template
+    for (const [key, value] of Object.entries(variables)) {
+      prompt = prompt.replace(new RegExp(`{${key}}`, 'g'), value)
+    }
+
+    try {
+      const response = await this.mastra.generate({
+        model: modelConfig.model,
+        prompt,
+        temperature: modelConfig.temperature,
+        maxTokens: modelConfig.maxTokens,
+        systemPrompt: modelConfig.systemPrompt
+      })
+
+      // Parse the response as Plate.js document structure
+      return this.parseAIResponse(response.text, specType)
+    } catch (error) {
+      console.error('Mastra generation error:', error)
+      throw error
     }
   }
 

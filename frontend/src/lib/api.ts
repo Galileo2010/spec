@@ -1,14 +1,53 @@
 import axios from 'axios'
-import { 
-  User, 
-  Project, 
-  SpecFiles, 
-  LoginRequest, 
-  RegisterRequest, 
-  CreateProjectRequest,
-  UpdateProjectRequest,
-  GenerateSpecRequest
-} from '@shared/types'
+// Types
+interface User {
+  id: string
+  email: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+interface Project {
+  id: string
+  name: string
+  description?: string
+  userId: string
+  createdAt: string
+  updatedAt: string
+}
+
+interface SpecFiles {
+  requirements?: any[]
+  design?: any[]
+  tasks?: any[]
+}
+
+interface LoginRequest {
+  email: string
+  password: string
+}
+
+interface RegisterRequest {
+  email: string
+  name: string
+  password: string
+}
+
+interface CreateProjectRequest {
+  name: string
+  description?: string
+}
+
+interface UpdateProjectRequest {
+  name?: string
+  description?: string
+}
+
+interface GenerateSpecRequest {
+  input: string
+  specType: 'requirements' | 'design' | 'tasks'
+}
 
 const api = axios.create({
   baseURL: '/api',
@@ -114,3 +153,9 @@ export const aiService = {
     return response.data
   },
 }
+
+// Alias for backward compatibility
+export const specService = projectService
+
+// Export types
+export type { User, Project, SpecFiles, LoginRequest, RegisterRequest, CreateProjectRequest, UpdateProjectRequest, GenerateSpecRequest }

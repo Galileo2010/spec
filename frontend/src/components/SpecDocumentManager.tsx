@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useProject } from '@/contexts/ProjectContext'
 import { useToast } from '@/hooks/use-toast'
-import PlateEditor from './PlateEditor'
+import SimplePlateEditor from './SimplePlateEditor'
 import { 
   FileText, 
   Layers, 

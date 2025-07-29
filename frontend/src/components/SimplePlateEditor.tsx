@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
@@ -18,27 +18,12 @@ import {
   CheckCircle
 } from 'lucide-react'
 
-// 简化的文档节点类型
-interface SimpleNode {
-  type: string
-  children?: SimpleNode[]
-  text?: string
-  [key: string]: any
-}
-
 interface SimplePlateEditorProps {
   specType: 'requirements' | 'design' | 'tasks'
-  initialValue: SimpleNode[]
+  initialValue: any[]
   projectId: string
-  onSave?: (content: SimpleNode[]) => Promise<void>
+  onSave?: (content: any[]) => Promise<void>
 }
-
-const defaultValue: SimpleNode[] = [
-  {
-    type: 'paragraph',
-    children: [{ text: '' }],
-  },
-]
 
 export default function SimplePlateEditor({ 
   specType, 
@@ -46,61 +31,62 @@ export default function SimplePlateEditor({
   projectId, 
   onSave 
 }: SimplePlateEditorProps) {
-  const [value, setValue] = useState<SimpleNode[]>(initialValue || defaultValue)
+  const [content, setContent] = useState<string>('')
   const [isSaving, setIsSaving] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [aiInput, setAiInput] = useState('')
   const [showAiPanel, setShowAiPanel] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const [documentStats, setDocumentStats] = useState({ words: 0, characters: 0 })
   const { toast } = useToast()
 
-  // 更新值时检查变化
-  useEffect(() => {
-    setValue(initialValue || defaultValue)
-    calculateStats(initialValue || defaultValue)
-  }, [initialValue])
-
-  // 跟踪未保存的更改
-  useEffect(() => {
-    const hasChanges = JSON.stringify(value) !== JSON.stringify(initialValue)
-    setHasUnsavedChanges(hasChanges)
-  }, [value, initialValue])
-
-  // 计算文档统计
-  const calculateStats = useCallback((content: SimpleNode[]) => {
-    const text = extractTextFromNodes(content)
-    const words = text.trim() ? text.trim().split(/\s+/).length : 0
-    const characters = text.length
-    setDocumentStats({ words, characters })
+  // 将Plate.js格式转换为简单文本
+  const plateToText = useCallback((plateContent: any[]): string => {
+    if (!plateContent || plateContent.length === 0) return ''
+    
+    return plateContent.map(node => {
+      if (node.children) {
+        return node.children.map((child: any) => child.text || '').join('')
+      }
+      return node.text || ''
+    }).join('\n')
   }, [])
 
-  // 从节点中提取文本
-  const extractTextFromNodes = (nodes: SimpleNode[]): string => {
-    return nodes.map(node => {
-      if (node.text) return node.text
-      if (node.children) return extractTextFromNodes(node.children)
-      return ''
-    }).join(' ')
-  }
+  // 将文本转换为简单的Plate.js格式
+  const textToPlate = useCallback((text: string): any[] => {
+    if (!text.trim()) {
+      return [{ type: 'p', children: [{ text: '' }] }]
+    }
+    
+    return text.split('\n').map(line => ({
+      type: 'p',
+      children: [{ text: line }]
+    }))
+  }, [])
 
-  // 更新文档统计
+  // 初始化内容
   useEffect(() => {
-    calculateStats(value)
-  }, [value, calculateStats])
+    const textContent = plateToText(initialValue)
+    setContent(textContent)
+  }, [initialValue, plateToText])
+
+  // 检测内容变化
+  useEffect(() => {
+    const initialText = plateToText(initialValue)
+    setHasUnsavedChanges(content !== initialText)
+  }, [content, initialValue, plateToText])
 
   const handleSave = useCallback(async () => {
     if (isSaving) return
     
     setIsSaving(true)
     try {
+      const plateContent = textToPlate(content)
+      
       if (onSave) {
-        await onSave(value)
-      } else {
-        // 模拟保存
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await onSave(plateContent)
       }
+      
       setLastSaved(new Date())
       setHasUnsavedChanges(false)
       toast({
@@ -117,7 +103,7 @@ export default function SimplePlateEditor({
     } finally {
       setIsSaving(false)
     }
-  }, [value, onSave, toast, isSaving])
+  }, [content, onSave, toast, textToPlate])
 
   const handleAiGenerate = useCallback(async () => {
     if (!aiInput.trim()) {
@@ -131,32 +117,16 @@ export default function SimplePlateEditor({
 
     setIsGenerating(true)
     try {
-      // 模拟 AI 生成
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // 模拟AI生成
+      const generatedText = `# ${getSpecTypeLabel()}\n\n基于输入"${aiInput}"生成的内容：\n\n这是一个示例${getSpecTypeLabel()}，展示了AI生成的功能。\n\n## 主要特点\n\n- 智能内容生成\n- 结构化文档\n- 用户友好的界面`
       
-      const generatedContent: SimpleNode[] = [
-        {
-          type: 'heading',
-          level: 2,
-          children: [{ text: `AI 生成的${getSpecTypeLabel()}` }]
-        },
-        {
-          type: 'paragraph',
-          children: [{ text: `基于输入"${aiInput}"生成的内容。` }]
-        },
-        {
-          type: 'paragraph',
-          children: [{ text: '这是一个模拟的 AI 生成结果，展示了系统的生成能力。' }]
-        }
-      ]
-      
-      setValue([...value, ...generatedContent])
+      setContent(generatedText)
       setAiInput('')
       setShowAiPanel(false)
       
       toast({
         title: 'AI 生成成功',
-        description: '内容已添加到编辑器中',
+        description: '内容已生成到编辑器中',
       })
     } catch (error) {
       console.error('AI generation error:', error)
@@ -168,19 +138,9 @@ export default function SimplePlateEditor({
     } finally {
       setIsGenerating(false)
     }
-  }, [aiInput, value, toast])
+  }, [aiInput, toast])
 
-  // 自动保存
-  useEffect(() => {
-    if (hasUnsavedChanges && value.length > 0) {
-      const autoSaveTimer = setTimeout(() => {
-        handleSave()
-      }, 3000)
-      return () => clearTimeout(autoSaveTimer)
-    }
-  }, [value, hasUnsavedChanges, handleSave])
-
-  // 快捷键
+  // 快捷键保存
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 's') {
@@ -219,21 +179,6 @@ export default function SimplePlateEditor({
     }
   }
 
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value
-    const newValue: SimpleNode[] = text ? [
-      {
-        type: 'paragraph',
-        children: [{ text }]
-      }
-    ] : defaultValue
-    setValue(newValue)
-  }
-
-  const getCurrentText = () => {
-    return extractTextFromNodes(value)
-  }
-
   return (
     <div className="h-full flex flex-col">
       {/* 工具栏 */}
@@ -241,29 +186,29 @@ export default function SimplePlateEditor({
         <div className="flex items-center space-x-2">
           {/* 格式化工具 */}
           <div className="flex items-center space-x-1 border-r pr-2">
-            <Button variant="ghost" size="sm" title="粗体">
+            <Button variant="ghost" size="sm" title="粗体" disabled>
               <Bold className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" title="斜体">
+            <Button variant="ghost" size="sm" title="斜体" disabled>
               <Italic className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" title="标题1">
+            <Button variant="ghost" size="sm" title="标题1" disabled>
               <Heading1 className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" title="标题2">
+            <Button variant="ghost" size="sm" title="标题2" disabled>
               <Heading2 className="h-4 w-4" />
             </Button>
           </div>
 
           {/* 列表工具 */}
           <div className="flex items-center space-x-1 border-r pr-2">
-            <Button variant="ghost" size="sm" title="无序列表">
+            <Button variant="ghost" size="sm" title="无序列表" disabled>
               <List className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" title="有序列表">
+            <Button variant="ghost" size="sm" title="有序列表" disabled>
               <ListOrdered className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" title="代码块">
+            <Button variant="ghost" size="sm" title="代码块" disabled>
               <Code className="h-4 w-4" />
             </Button>
           </div>
@@ -287,9 +232,9 @@ export default function SimplePlateEditor({
         <div className="flex items-center space-x-4">
           {/* 文档统计 */}
           <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-            <span>{documentStats.words} 词</span>
+            <span>{content.split(/\s+/).filter(w => w).length} 词</span>
             <span>•</span>
-            <span>{documentStats.characters} 字符</span>
+            <span>{content.length} 字符</span>
           </div>
 
           {/* 保存状态 */}
@@ -376,7 +321,7 @@ export default function SimplePlateEditor({
       {/* 编辑器 */}
       <div className="flex-1 overflow-auto bg-background">
         <div className="h-full">
-          {getCurrentText().length === 0 ? (
+          {!content.trim() ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center max-w-md">
                 <div className="mb-4">
@@ -399,9 +344,9 @@ export default function SimplePlateEditor({
           ) : (
             <div className="p-6 max-w-4xl mx-auto">
               <textarea
-                value={getCurrentText()}
-                onChange={handleContentChange}
-                className="w-full min-h-[500px] p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm leading-relaxed"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="w-full h-full min-h-[500px] resize-none border-none outline-none bg-transparent font-mono text-sm leading-relaxed"
                 placeholder={getPlaceholderText()}
               />
             </div>

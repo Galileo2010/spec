@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Settings, Zap } from 'lucide-react'
-import PlateEditor from '@/components/PlateEditor'
+import SimplePlateEditor from '@/components/SimplePlateEditor'
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()

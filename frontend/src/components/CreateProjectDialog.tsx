@@ -30,7 +30,7 @@ export default function CreateProjectDialog({ open, onOpenChange }: CreateProjec
     setIsLoading(true)
 
     try {
-      await createProject(name, description)
+      await createProject({ name, description })
       toast({
         title: '项目创建成功',
         description: `项目 "${name}" 已创建`,
