@@ -80,7 +80,7 @@ export default function ProjectDetailPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="h-full pb-6">
-                  <PlateEditor
+                  <SimplePlateEditor
                     specType="requirements"
                     initialValue={currentSpecs?.requirements || []}
                     projectId={currentProject.id}
@@ -98,7 +98,7 @@ export default function ProjectDetailPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="h-full pb-6">
-                  <PlateEditor
+                  <SimplePlateEditor
                     specType="design"
                     initialValue={currentSpecs?.design || []}
                     projectId={currentProject.id}
@@ -116,7 +116,7 @@ export default function ProjectDetailPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="h-full pb-6">
-                  <PlateEditor
+                  <SimplePlateEditor
                     specType="tasks"
                     initialValue={currentSpecs?.tasks || []}
                     projectId={currentProject.id}

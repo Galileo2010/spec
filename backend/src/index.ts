@@ -31,6 +31,11 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// Test route
+app.get('/api/test', (c) => {
+  return c.json({ message: 'Backend is working', timestamp: new Date() })
+})
+
 // Public routes
 app.route('/api/auth', authRoutes)
 

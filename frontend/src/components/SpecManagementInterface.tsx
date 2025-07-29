@@ -515,7 +515,7 @@ export default function SpecManagementInterface({ projectId }: SpecManagementInt
 
             <div className="flex-1">
               <TabsContent value="requirements" className="h-full m-0">
-                <PlateEditor
+                <SimplePlateEditor
                   specType="requirements"
                   initialValue={specs.requirements || defaultValue}
                   projectId={projectId}
@@ -524,7 +524,7 @@ export default function SpecManagementInterface({ projectId }: SpecManagementInt
               </TabsContent>
 
               <TabsContent value="design" className="h-full m-0">
-                <PlateEditor
+                <SimplePlateEditor
                   specType="design"
                   initialValue={specs.design || defaultValue}
                   projectId={projectId}
@@ -533,7 +533,7 @@ export default function SpecManagementInterface({ projectId }: SpecManagementInt
               </TabsContent>
 
               <TabsContent value="tasks" className="h-full m-0">
-                <PlateEditor
+                <SimplePlateEditor
                   specType="tasks"
                   initialValue={specs.tasks || defaultValue}
                   projectId={projectId}

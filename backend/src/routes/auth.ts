@@ -60,19 +60,24 @@ authRoutes.post('/register', async (c) => {
 authRoutes.post('/login', async (c) => {
   try {
     const body = await c.req.json()
+    console.log('Login attempt:', { email: body.email, password: body.password })
     const { email, password } = LoginSchema.parse(body)
 
     // Get user from database
     const stmt = db.prepare('SELECT * FROM users WHERE email = ?')
     const user = stmt.get(email) as any
+    console.log('User found:', user ? 'Yes' : 'No')
 
     if (!user) {
+      console.log('No user found for email:', email)
       return c.json({ error: 'Invalid credentials' }, 401)
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password_hash)
+    console.log('Password valid:', isValidPassword)
     if (!isValidPassword) {
+      console.log('Invalid password for user:', email)
       return c.json({ error: 'Invalid credentials' }, 401)
     }
 
